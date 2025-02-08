@@ -1,0 +1,7 @@
+-i https://pypi.tuna.tsinghua.edu.cn/simple
+
+numpy>=1.21.0
+opencv-python>=4.5.0
+onnxruntime>=1.8.0
+gradio>=4.0.0
+Pillow>=8.0.0 

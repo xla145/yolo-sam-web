@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+models/
+*.onnx
+*.pth
+*.pt
+*.weights
+*.h5
+
+# Logs
+*.log
+logs/
+tensorboard/
+
+# Test
+test_images/
+output/
+results/
+*.png
+*.jpg
+*.jpeg
+!test.png
+
+# Gradio
+gradio_cached_examples/
+flagged/ 
