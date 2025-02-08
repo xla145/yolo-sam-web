@@ -25,20 +25,54 @@ def contours_to_coco_format(contours, label_masks, annotation_id):
     return coco_annotations
 
 
-def draw_masks(image: np.ndarray, masks: dict[int, np.ndarray], alpha: float = 0.5, draw_border: bool = True) -> np.ndarray:
-    mask_image = image.copy()
+def draw_masks(image, masks):
+    """
+    在图像上绘制所有分割掩码
+    
+    Args:
+        image: 原始图像
+        masks: 包含所有掩码的字典，格式为 {mask_id_idx: mask}
+    
+    Returns:
+        image: 绘制了掩码的图像
+        mask_points: 所有掩码的轮廓点
+    """
+    mask_points = {}
+    # 为每个掩码生成不同的随机颜色
+    colors = {}
+    
+    # 首先获取基础类别（去掉索引号）
+    for mask_id in masks.keys():
+        base_id = mask_id.split('_')[0]  # 获取基础类别ID
+        if base_id not in colors:
+            colors[base_id] = tuple(np.random.randint(0, 255, 3).tolist())
 
-    mask_pionts = []
+    # 按掩码绘制
+    for mask_id, mask in masks.items():
+        base_id = mask_id.split('_')[0]  # 获取基础类别ID
+        color = colors[base_id]
+        
+        # 创建彩色掩码
+        colored_mask = np.zeros_like(image)
+        colored_mask[mask == 1] = color
+        
+        # 将掩码与原图像混合
+        alpha = 0.5
+        mask_area = (mask == 1)
+        image[mask_area] = cv2.addWeighted(image[mask_area], 1-alpha, colored_mask[mask_area], alpha, 0)
+        
+        # 获取掩码轮廓
+        contours, _ = cv2.findContours((mask * 255).astype(np.uint8), 
+                                     cv2.RETR_EXTERNAL, 
+                                     cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 存储轮廓点
+        if contours:
+            mask_points[mask_id] = contours[0].squeeze().tolist()
+            # 绘制轮廓
+            cv2.drawContours(image, contours, -1, color, 2)
 
-    for label_id, label_masks in masks.items():
-        if label_masks is None:
-            continue
-        color = colors[label_id]
-        mask_image, contours = draw_mask(mask_image, label_masks, (color[0], color[1], color[2]), alpha, draw_border)
-        # 把contours的点转成list
-        coco = contours_to_coco_format(contours, [label_id], 1)
-        mask_pionts.append(coco)
-    return mask_image, mask_pionts
+    return image, mask_points
 
 def draw_mask(image: np.ndarray, mask: np.ndarray, color: tuple = (0, 255, 0), alpha: float = 0.5, draw_border: bool = True) -> np.ndarray:
     mask_image = image.copy()

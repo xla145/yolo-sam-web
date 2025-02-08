@@ -28,12 +28,15 @@ def process_image(image):
         # 设置SAM的输入图像
         sam2.set_image(image_copy)
         all_masks = {}
-        for (box, score, class_id) in _results:
-            print(box)
+        
+        # 先获取所有边界框的 masks
+        for idx, (box, score, class_id) in enumerate(_results):
             x1, y1, w, h = map(int, box)
             sam2.set_box(((x1, y1), (x1 + w, y1 + h)), label_id=class_id)
             masks = sam2.get_masks()
-            all_masks.update(masks)
+            # 为每个检测结果添加唯一的标识符
+            renamed_masks = {f"{k}_{idx}": v for k, v in masks.items()}
+            all_masks.update(renamed_masks)
         
         # 在图像上绘制所有分割结果
         if all_masks:
@@ -67,11 +70,11 @@ def create_demo():
         outputs=gr.Image(),
         title="人物检测与分割演示",
         description="上传一张图片，系统将自动检测并分割出人物。",
-        examples=["test.png"]
+        examples=["bus.jpg"]
     )
     return demo
 
 if __name__ == "__main__":
     # 创建并启动 Gradio 界面
     demo = create_demo()
-    demo.launch(share=True) 
+    demo.launch() 
