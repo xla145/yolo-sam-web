@@ -4,6 +4,31 @@ import numpy as np
 rng = np.random.default_rng(2)
 colors = rng.uniform(0, 255, size=(100, 3))
 
+# 预定义颜色列表（可根据需要扩展）
+PREDEFINED_COLORS = [
+    (255, 0, 0),      # Blue
+    (0, 255, 0),      # Green
+    (0, 0, 255),      # Red
+    (255, 255, 0),    # Cyan
+    (255, 0, 255),    # Magenta
+    (0, 255, 255),    # Yellow
+    (128, 0, 0),      # Maroon
+    (0, 128, 0),      # Dark Green
+    (0, 0, 128),      # Navy
+    (128, 128, 0),    # Olive
+    (128, 0, 128),    # Purple
+    (0, 128, 128),    # Teal
+    (192, 192, 192),  # Silver
+    (128, 128, 128),  # Gray
+    (0, 0, 0)         # Black
+]
+
+def get_color(index):
+    """
+    根据索引返回预定义的颜色，循环使用颜色列表
+    """
+    return PREDEFINED_COLORS[index % len(PREDEFINED_COLORS)]
+
 def contours_to_coco_format(contours, label_masks, annotation_id):
     coco_annotations = []
     
@@ -27,54 +52,70 @@ def contours_to_coco_format(contours, label_masks, annotation_id):
 
 def draw_masks(image, masks):
     """
-    在图像上绘制所有分割掩码
-    
+    在图像上绘制所有分割掩码，并美化颜色
+
     Args:
-        image: 原始图像
+        image: 原始图像（BGR格式）
         masks: 包含所有掩码的字典，格式为 {mask_id_idx: mask}
-    
+
     Returns:
         image: 绘制了掩码的图像
         mask_points: 所有掩码的轮廓点
     """
     mask_points = {}
-    # 为每个掩码生成不同的随机颜色
     colors = {}
     
-    # 首先获取基础类别（去掉索引号）
+    # 为每个类别分配一个固定颜色
     for mask_id in masks.keys():
         base_id = mask_id.split('_')[0]  # 获取基础类别ID
         if base_id not in colors:
-            colors[base_id] = tuple(np.random.randint(0, 255, 3).tolist())
-
-    # 按掩码绘制
+            # 使用类别索引分配颜色，假设 base_id 是整数或可转换为整数
+            try:
+                class_index = int(base_id)
+            except ValueError:
+                class_index = hash(base_id)  # 否则使用哈希值
+            colors[base_id] = get_color(class_index)
+    
+    # 获取图像尺寸
+    height, width = image.shape[:2]
+    
+    # 创建一个透明层用于绘制掩码
+    overlay = image.copy()
+    
     for mask_id, mask in masks.items():
-        base_id = mask_id.split('_')[0]  # 获取基础类别ID
+        base_id = mask_id.split('_')[0]
         color = colors[base_id]
         
+        # 确保掩码尺寸与图像匹配
+        if mask.shape[:2] != (height, width):
+            mask = cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
+        
+        # 标准化掩码值到 0-1
+        mask = (mask > 0.5).astype(np.uint8)
+        
         # 创建彩色掩码
-        colored_mask = np.zeros_like(image)
+        colored_mask = np.zeros_like(image, dtype=np.uint8)
         colored_mask[mask == 1] = color
         
-        # 将掩码与原图像混合
-        alpha = 0.5
-        mask_area = (mask == 1)
-        image[mask_area] = cv2.addWeighted(image[mask_area], 1-alpha, colored_mask[mask_area], alpha, 0)
+        # 将彩色掩码叠加到透明层上
+        overlay = cv2.addWeighted(overlay, 1.0, colored_mask, 0.5, 0)
         
         # 获取掩码轮廓
-        contours, _ = cv2.findContours((mask * 255).astype(np.uint8), 
-                                     cv2.RETR_EXTERNAL, 
-                                     cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(mask, 
+                                       cv2.RETR_EXTERNAL, 
+                                       cv2.CHAIN_APPROX_SIMPLE)
         
-        # 存储轮廓点
+        # 存储轮廓点并绘制边界
         if contours:
             mask_points[mask_id] = contours[0].squeeze().tolist()
-            # 绘制轮廓
-            cv2.drawContours(image, contours, -1, color, 2)
-
+            cv2.drawContours(overlay, contours, -1, color, 2)
+    
+    # 合并透明层与原图像
+    image = overlay
+    
     return image, mask_points
 
-def draw_mask(image: np.ndarray, mask: np.ndarray, color: tuple = (0, 255, 0), alpha: float = 0.5, draw_border: bool = True) -> np.ndarray:
+def draw_mask(image: np.ndarray, mask: np.ndarray, color: tuple = (0, 255, 0), alpha: float = 0.8, draw_border: bool = True) -> np.ndarray:
     mask_image = image.copy()
     mask_image[mask > 0.01] = color
     mask_image = cv2.addWeighted(image, 1-alpha, mask_image, alpha, 0)
